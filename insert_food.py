@@ -1,10 +1,9 @@
 import psycopg2
 import os
 from dotenv import load_dotenv
-
+ 
 # Load environment variables from .env
 load_dotenv()
-
 # Read database credentials
 USER = os.getenv("USER")
 PASSWORD = os.getenv("PASSWORD")
