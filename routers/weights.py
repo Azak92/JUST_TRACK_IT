@@ -6,6 +6,7 @@ from uuid import uuid4, UUID
 
 from schemas import WeightIn, WeightOut
 from database import get_pg_connection
+from utils.auth import get_current_user_id
 
 router = APIRouter(
     prefix="/weights",
@@ -15,37 +16,38 @@ router = APIRouter(
 @router.post(
     "/",
     response_model=WeightOut,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
 )
 async def log_weight(
     entry: WeightIn,
+    user_id: str = Depends(get_current_user_id),
     conn = Depends(get_pg_connection),
 ):
     """
-    Insert a new weight entry and return it (including generated id + logged_at).
+    Create a new weight log for the authenticated user and return it.
     """
     new_id = str(uuid4())
-    row = await conn.fetchrow(
+    record = await conn.fetchrow(
         """
         INSERT INTO weight_logs (id, user_id, weight)
         VALUES ($1, $2, $3)
         RETURNING id, user_id, weight, logged_at
         """,
-        new_id, str(entry.user_id), entry.weight
+        new_id, user_id, entry.weight,
     )
-    return row
+    return dict(record)
 
 
 @router.get(
-    "/{user_id}",
-    response_model=List[WeightOut]
+    "/",
+    response_model=List[WeightOut],
 )
 async def get_weights(
-    user_id: UUID = Path(..., description="UUID of the user"),
+    user_id: str = Depends(get_current_user_id),
     conn = Depends(get_pg_connection),
 ):
     """
-    Fetch all weight entries for a given user, newest first.
+    Fetch all weight entries for the authenticated user, newest first.
     """
     rows = await conn.fetch(
         """
@@ -54,23 +56,23 @@ async def get_weights(
         WHERE user_id = $1
         ORDER BY logged_at DESC
         """,
-        str(user_id)
+        user_id,
     )
-    return rows
+    return [dict(r) for r in rows]
 
 
 @router.get(
-    "/latest/{user_id}",
-    response_model=WeightOut
+    "/latest",
+    response_model=WeightOut,
 )
 async def get_latest_weight(
-    user_id: UUID = Path(..., description="UUID of the user"),
+    user_id: str = Depends(get_current_user_id),
     conn = Depends(get_pg_connection),
 ):
     """
-    Fetch the single most recent weight entry for a user.
+    Fetch the single most recent weight entry for the authenticated user.
     """
-    row = await conn.fetchrow(
+    record = await conn.fetchrow(
         """
         SELECT id, user_id, weight, logged_at
         FROM weight_logs
@@ -78,33 +80,36 @@ async def get_latest_weight(
         ORDER BY logged_at DESC
         LIMIT 1
         """,
-        str(user_id)
+        user_id,
     )
-    if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No weight log found")
-    return row
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No weight log found"
+        )
+    return dict(record)
 
 
 @router.delete(
     "/{entry_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a weight entry by its ID",
 )
 async def delete_weight(
     entry_id: UUID = Path(..., description="ID of the weight entry to remove"),
+    user_id: str = Depends(get_current_user_id),
     conn = Depends(get_pg_connection),
 ):
     """
-    Permanently remove a weight log. Returns 204 No Content on success,
-    or 404 if no such entry exists.
+    Permanently remove a weight log belonging to the authenticated user.
+    Returns 204 No Content on success or 404 if not found.
     """
     result = await conn.execute(
-        "DELETE FROM weight_logs WHERE id = $1",
-        str(entry_id),
+        "DELETE FROM weight_logs WHERE id = $1 AND user_id = $2",
+        str(entry_id), user_id,
     )
     if result == "DELETE 0":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Weight entry not found"
         )
-    # 204 No Content – nothing to return
+    # 204 No Content implicitly returns None

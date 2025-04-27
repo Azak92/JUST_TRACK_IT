@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from routers import weights, foods  # importing modular route groups
-from database import get_pg_connection  # keep DB connection available
+from dotenv import load_dotenv
 
+load_dotenv() 
 app = FastAPI()
 
 # Plug in routers (all route logic is elsewhere)

@@ -14,7 +14,6 @@ class FoodOut(FoodIn):
 
 # this is input from user
 class WeightIn(BaseModel):
-    user_id: UUID
     weight: float
 
 # This is output and update from database
