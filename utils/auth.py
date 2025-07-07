@@ -1,8 +1,17 @@
 import os
+from dotenv import load_dotenv
 from jose import jwt, JWTError
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from supabase import create_client
 
+# ─── Load .env for local development ───
+load_dotenv()
+
+# ─── Supabase client for Admin actions (e.g. issuing JWTs) ───
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")   # your service_role key
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # fastapi will read the "Authorization: Bearer <token>" header
 bearer_scheme = HTTPBearer()
 
