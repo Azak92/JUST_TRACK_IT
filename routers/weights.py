@@ -22,30 +22,33 @@ async def add_weight(
     req: WeightRequest,
     user_id: str = Depends(get_current_user_id),
 ):
-    """
-    Inserts a new row into the `weight_logs` table via Supabase's REST API.
-    """
     row = {"user_id": user_id, "weight": req.weight}
 
     try:
         resp = (
             supabase
-            .from_("weight_logs")      # ← use your actual table name
-            .insert([row])             # insert expects a list of rows
+            .from_("weight_logs")   # ← your actual table name
+            .insert([row])          # always wrap row in a list
             .execute()
         )
     except APIError as e:
+        # network or path‐not‐found errors bubble up as APIError
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Supabase insert error: {e}"
         )
 
-    if resp.error:
+    # Now check the HTTP status code instead of resp.error
+    code = getattr(resp, "status_code", None)
+    if code is None or code >= 300:
+        # resp.data might contain more info in error cases
+        detail = resp.data or f"HTTP {code}"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Insert failed: {resp.error.message}"
+            detail=f"Insert failed: {detail}"
         )
 
+    # resp.data is a list of inserted records
     inserted = resp.data[0]
 
     return WeightResponse(
