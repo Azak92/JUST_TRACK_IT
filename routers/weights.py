@@ -1,5 +1,3 @@
-# routers/weights.py
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from datetime import datetime
@@ -15,45 +13,46 @@ class WeightResponse(BaseModel):
     id: int
     user_id: str
     weight: float
-    recorded_at: datetime
+    logged_at: datetime   # match your actual column name
 
 @router.post("/", response_model=WeightResponse)
 async def add_weight(
     req: WeightRequest,
     user_id: str = Depends(get_current_user_id),
 ):
+    """
+    Inserts a new row into the `weight_logs` table via Supabase REST.
+    """
     row = {"user_id": user_id, "weight": req.weight}
 
     try:
         resp = (
             supabase
-            .from_("weight_logs")   # ← your actual table name
-            .insert([row])          # always wrap row in a list
+            .from_("weight_logs")   # ← your real table name
+            .insert([row])          # insert expects a list
             .execute()
         )
     except APIError as e:
-        # network or path‐not‐found errors bubble up as APIError
+        # network/404/etc
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Supabase insert error: {e}"
         )
 
-    # Now check the HTTP status code instead of resp.error
-    code = getattr(resp, "status_code", None)
-    if code is None or code >= 300:
-        # resp.data might contain more info in error cases
-        detail = resp.data or f"HTTP {code}"
+    # At this point resp.data should be a list with your new record
+    try:
+        inserted = resp.data[0]
+    except (IndexError, TypeError):
+        # truly unexpected: no data back
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Insert failed: {detail}"
+            detail="Insert failed: no data returned"
         )
 
-    # resp.data is a list of inserted records
-    inserted = resp.data[0]
-
+    # Return exactly what came back
     return WeightResponse(
         id=inserted["id"],
         user_id=inserted["user_id"],
         weight=inserted["weight"],
-        recorded_at=inserted["recorded_at"],
+        logged_at=inserted["logged_at"],
     )
