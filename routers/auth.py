@@ -13,24 +13,29 @@ class LoginResponse(BaseModel):
     refresh_token: str
 
 @router.post("/login", response_model=LoginResponse)
-async def login(req: LoginRequest):
+async def login(req: LoginRequest) -> LoginResponse:
     """
     Sign in a user via Supabase Auth and return
     the access & refresh tokens.
     """
+    # sign_in_with_password() returns an AuthResponse object
     resp = supabase.auth.sign_in_with_password({
         "email":    req.email,
         "password": req.password,
     })
-    if resp.get("error"):
-        # Supabase returns {"error": {...}} on failure
+
+    # Use attribute access, not dict.get()
+    if resp.error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=resp["error"]["message"]
+            detail=resp.error.message or "Authentication failed"
         )
-    # On success, `data.session` holds both tokens:
-    session = resp["data"]["session"]
-    return {
-        "access_token":  session["access_token"],
-        "refresh_token": session["refresh_token"],
-    }
+
+    # resp.data.session is a Session object with .access_token and .refresh_token
+    session = resp.data.session
+
+    # Return your Pydantic model explicitly
+    return LoginResponse(
+        access_token=session.access_token,
+        refresh_token=session.refresh_token,
+    )
