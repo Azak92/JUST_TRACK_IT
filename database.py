@@ -2,6 +2,8 @@ import asyncpg
 import os
 from dotenv import load_dotenv
 
+print("→ DATABASE_URL =", os.getenv("DATABASE_URL"))
+
 # Load environment variables
 load_dotenv()
 
