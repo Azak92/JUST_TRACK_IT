@@ -18,23 +18,22 @@ async def login(req: LoginRequest) -> LoginResponse:
     Sign in a user via Supabase Auth and return
     the access & refresh tokens.
     """
-    # sign_in_with_password() returns an AuthResponse object
+    # sign_in_with_password() returns an AuthResponse(user, session)
     resp = supabase.auth.sign_in_with_password({
         "email":    req.email,
         "password": req.password,
     })
 
-    # Use attribute access, not dict.get()
-    if resp.error:
+    # If no session was returned, credentials were invalid
+    if resp.session is None:  
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=resp.error.message or "Authentication failed"
+            detail="Invalid email or password"
         )
 
-    # resp.data.session is a Session object with .access_token and .refresh_token
-    session = resp.data.session
+    # resp.session is a Session object with .access_token and .refresh_token
+    session = resp.session
 
-    # Return your Pydantic model explicitly
     return LoginResponse(
         access_token=session.access_token,
         refresh_token=session.refresh_token,
