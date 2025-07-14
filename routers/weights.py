@@ -10,7 +10,7 @@ class WeightRequest(BaseModel):
     weight: float
 
 class WeightResponse(BaseModel):
-    id: int
+    id: str
     user_id: str
     weight: float
     logged_at: datetime   # match your actual column name
