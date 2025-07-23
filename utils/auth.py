@@ -1,4 +1,3 @@
-# utils/auth.py
 import os
 from dotenv import load_dotenv
 from fastapi import HTTPException, Security, status
